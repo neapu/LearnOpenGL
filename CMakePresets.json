@@ -1,0 +1,20 @@
+{
+    "version": 4,
+    "configurePresets": [{
+        "name": "Linux-Debug",
+        "displayName": "Linux Debug",
+        "description": "Use this preset for debug builds on Linux.",
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/build/${presetName}",
+        "cacheVariables": {
+            "CMAKE_BUILD_TYPE": "Debug",
+            "CMAKE_PREFIX_PATH": "$env{SDL3_DIR}/lib/cmake/SDL3"
+        }
+    }],
+    "buildPresets": [{
+        "name": "Linux-Debug",
+        "configurePreset": "Linux-Debug",
+        "displayName": "Build Linux Debug",
+        "configuration": "Debug"
+    }]
+}
