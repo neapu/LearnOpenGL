@@ -13,6 +13,11 @@ add_executable(LearnOpenGL
     Shader.h
 )
 
+# 添加 stb 头文件路径
+target_include_directories(LearnOpenGL PRIVATE
+    ${CMAKE_SOURCE_DIR}/third_party/stb
+)
+
 target_link_libraries(LearnOpenGL PRIVATE 
     SDL3::SDL3 
     OpenGL::GL 

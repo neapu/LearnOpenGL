@@ -88,4 +88,7 @@ private:
     unsigned int m_VAO{0};    ///< 顶点数组对象 ID，存储顶点属性配置
     unsigned int m_VBO{0};    ///< 顶点缓冲对象 ID，存储顶点数据
     unsigned int m_EBO{0};    ///< 索引缓冲对象 ID，存储顶点索引（用于顶点复用）
+    unsigned int m_texture{0}; ///< 纹理对象 ID，存储加载的图片纹理
 };
+
+
