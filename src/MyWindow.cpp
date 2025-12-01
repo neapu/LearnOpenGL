@@ -14,15 +14,50 @@ constexpr int SCREEN_WIDTH = 800;
 constexpr int SCREEN_HEIGHT = 600;
 
 /**
- * @brief 三角形的顶点数据
+ * @brief 矩形的顶点数据
  * 
  * 每个顶点包含 3 个浮点数 (x, y, z)
  * 坐标系统使用标准化设备坐标 (NDC)，范围为 [-1, 1]
+ * 
+ * 矩形由 4 个顶点组成：
+ *   3 -------- 2
+ *   |          |
+ *   |          |
+ *   |          |
+ *   0 -------- 1
+ * 
+ * 使用 EBO 可以复用顶点，避免重复存储。
+ * 如果不使用 EBO，需要 6 个顶点（两个三角形）；
+ * 使用 EBO 后只需要 4 个顶点 + 6 个索引。
  */
 float vertices[] = {
-    -0.5f, -0.5f, 0.0f,   // 左下角顶点
-     0.5f, -0.5f, 0.0f,   // 右下角顶点
-     0.0f,  0.5f, 0.0f    // 顶部顶点
+    // 位置 (x, y, z)
+     0.5f,  0.5f, 0.0f,   // 顶点 0：右上角
+     0.5f, -0.5f, 0.0f,   // 顶点 1：右下角
+    -0.5f, -0.5f, 0.0f,   // 顶点 2：左下角
+    -0.5f,  0.5f, 0.0f    // 顶点 3：左上角
+};
+
+/**
+ * @brief 矩形的索引数据
+ * 
+ * 指定如何使用顶点数据构建三角形。
+ * 一个矩形由两个三角形组成：
+ * 
+ * 三角形 1：顶点 0 -> 1 -> 3（右上 -> 右下 -> 左上）
+ * 三角形 2：顶点 1 -> 2 -> 3（右下 -> 左下 -> 左上）
+ * 
+ *   3 -------- 0         3 -------- 0
+ *   | \        |         |        / |
+ *   |   \  T1  |   -->   |  T2  /   |
+ *   |     \    |         |    /     |
+ *   2 -------- 1         2 -------- 1
+ * 
+ * 索引顺序决定了三角形的绕序（逆时针为正面）
+ */
+unsigned int indices[] = {
+    0, 1, 3,   // 第一个三角形：右上 -> 右下 -> 左上
+    1, 2, 3    // 第二个三角形：右下 -> 左下 -> 左上
 };
 
 /**
@@ -88,23 +123,34 @@ bool MyWindow::initialize()
         return false;
     }
 
-    // 第二步：创建 VAO 和 VBO
+    // 第二步：创建 VAO、VBO 和 EBO
     // VAO (Vertex Array Object)：存储顶点属性配置的状态
     // VBO (Vertex Buffer Object)：存储实际的顶点数据
+    // EBO (Element Buffer Object)：存储顶点索引，用于顶点复用
     glGenVertexArrays(1, &m_VAO);
     glGenBuffers(1, &m_VBO);
+    glGenBuffers(1, &m_EBO);
 
-    // 第三步：绑定 VAO（后续的 VBO 和属性配置会记录到此 VAO）
+    // 第三步：绑定 VAO
+    // 注意：必须先绑定 VAO，后续的 VBO/EBO 和属性配置会记录到此 VAO
     glBindVertexArray(m_VAO);
 
     // 第四步：绑定 VBO 并上传顶点数据
     glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-    glBufferData(GL_ARRAY_BUFFER,   // 缓冲区类型
+    glBufferData(GL_ARRAY_BUFFER,   // 缓冲区类型：顶点数据
                  sizeof(vertices),   // 数据大小（字节）
                  vertices,           // 数据指针
                  GL_STATIC_DRAW);    // 使用模式：数据不会频繁改变
 
-    // 第五步：配置顶点属性
+    // 第五步：绑定 EBO 并上传索引数据
+    // EBO 用于实现顶点复用，减少内存占用
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,   // 缓冲区类型：索引数据
+                 sizeof(indices),            // 数据大小（字节）
+                 indices,                    // 数据指针
+                 GL_STATIC_DRAW);            // 使用模式
+
+    // 第六步：配置顶点属性
     // 告诉 OpenGL 如何解释 VBO 中的顶点数据
     glVertexAttribPointer(
         0,                   // 属性索引（对应着色器中的 location = 0）
@@ -117,6 +163,10 @@ bool MyWindow::initialize()
     
     // 启用顶点属性（索引 0）
     glEnableVertexAttribArray(0);
+
+    // 解绑 VAO（可选，防止意外修改）
+    // 注意：不要在 VAO 活动时解绑 EBO，因为 EBO 是 VAO 状态的一部分
+    glBindVertexArray(0);
 
     return true;
 }
@@ -149,17 +199,20 @@ void MyWindow::render()
     // 第二步：激活着色器程序
     m_shader.use();
 
-    // 第三步：绑定 VAO 并绘制
-    // 绑定 VAO 后，OpenGL 会使用其中存储的顶点属性配置
+    // 第三步：绑定 VAO
+    // 绑定 VAO 后，OpenGL 会使用其中存储的顶点属性配置和 EBO
     glBindVertexArray(m_VAO);
     
-    // 绘制三角形
-    // GL_TRIANGLES：绘制模式（每 3 个顶点组成一个三角形）
-    // 0：起始顶点索引
-    // 3：顶点数量
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    // 第四步：使用索引绘制矩形
+    // glDrawElements 使用 EBO 中的索引来绘制图元
+    glDrawElements(
+        GL_TRIANGLES,       // 绘制模式：三角形
+        6,                  // 索引数量（两个三角形，每个 3 个顶点）
+        GL_UNSIGNED_INT,    // 索引数据类型
+        0                   // EBO 中的偏移量（从开头开始）
+    );
 
-    // 第四步：交换缓冲区（双缓冲技术）
+    // 第五步：交换缓冲区（双缓冲技术）
     // 前缓冲区显示在屏幕上，后缓冲区用于绘制
     // 交换后，新绘制的内容会显示在屏幕上
     SDL_GL_SwapWindow(m_window);
@@ -179,6 +232,12 @@ void MyWindow::cleanup()
     if (m_VBO) {
         glDeleteBuffers(1, &m_VBO);
         m_VBO = 0;
+    }
+    
+    // 删除 EBO
+    if (m_EBO) {
+        glDeleteBuffers(1, &m_EBO);
+        m_EBO = 0;
     }
     
     // 注意：m_shader 会在析构时自动清理，无需手动处理
