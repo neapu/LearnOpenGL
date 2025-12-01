@@ -1,6 +1,7 @@
 #include "MyWindow.h"
 #include <glad/glad.h>
 #include <logger.h>
+#include <string>
 
 // ==================== 匿名命名空间 ====================
 // 存放仅在本文件中使用的常量和数据
@@ -14,28 +15,47 @@ constexpr int SCREEN_WIDTH = 800;
 constexpr int SCREEN_HEIGHT = 600;
 
 /**
- * @brief 矩形的顶点数据
+ * @brief 获取着色器文件路径
  * 
- * 每个顶点包含 3 个浮点数 (x, y, z)
- * 坐标系统使用标准化设备坐标 (NDC)，范围为 [-1, 1]
+ * Debug 模式：使用 SOURCE_DIR 宏获取项目根目录
+ * Release 模式：使用可执行文件的相对路径
  * 
- * 矩形由 4 个顶点组成：
- *   3 -------- 2
- *   |          |
- *   |          |
- *   |          |
- *   0 -------- 1
+ * @param filename 着色器文件名
+ * @return 着色器文件的完整路径
+ */
+std::string getShaderPath(const std::string& filename) {
+#ifdef DEBUG
+    // Debug 模式：使用 CMake 定义的源码目录
+    return std::string(SOURCE_DIR) + "/shader/" + filename;
+#else
+    // Release 模式：使用可执行文件的相对路径
+    return "../shader/" + filename;
+#endif
+}
+
+/**
+ * @brief 矩形的顶点数据（包含位置和颜色）
  * 
- * 使用 EBO 可以复用顶点，避免重复存储。
- * 如果不使用 EBO，需要 6 个顶点（两个三角形）；
- * 使用 EBO 后只需要 4 个顶点 + 6 个索引。
+ * 每个顶点包含 6 个浮点数：
+ * - 位置 (x, y, z)：标准化设备坐标 (NDC)，范围 [-1, 1]
+ * - 颜色 (r, g, b)：颜色分量，范围 [0, 1]
+ * 
+ * 矩形由 4 个顶点组成，每个顶点有不同的颜色：
+ *   3(蓝色) -------- 0(红色)
+ *   |                    |
+ *   |                    |
+ *   |                    |
+ *   2(黄色) -------- 1(绿色)
+ * 
+ * 在光栅化阶段，颜色会在顶点之间进行线性插值，
+ * 产生渐变色效果。
  */
 float vertices[] = {
-    // 位置 (x, y, z)
-     0.5f,  0.5f, 0.0f,   // 顶点 0：右上角
-     0.5f, -0.5f, 0.0f,   // 顶点 1：右下角
-    -0.5f, -0.5f, 0.0f,   // 顶点 2：左下角
-    -0.5f,  0.5f, 0.0f    // 顶点 3：左上角
+    // 位置 (x, y, z)        // 颜色 (r, g, b)
+     0.5f,  0.5f, 0.0f,      1.0f, 0.0f, 0.0f,   // 顶点 0：右上角 - 红色
+     0.5f, -0.5f, 0.0f,      0.0f, 1.0f, 0.0f,   // 顶点 1：右下角 - 绿色
+    -0.5f, -0.5f, 0.0f,      1.0f, 1.0f, 0.0f,   // 顶点 2：左下角 - 黄色
+    -0.5f,  0.5f, 0.0f,      0.0f, 0.0f, 1.0f    // 顶点 3：左上角 - 蓝色
 };
 
 /**
@@ -60,39 +80,6 @@ unsigned int indices[] = {
     1, 2, 3    // 第二个三角形：右下 -> 左下 -> 左上
 };
 
-/**
- * @brief 顶点着色器 GLSL 源代码
- * 
- * 功能：将顶点位置从属性传递到 gl_Position
- * - layout (location = 0)：指定属性位置索引为 0
- * - in vec3 aPos：输入的顶点位置（三维向量）
- * - gl_Position：内置输出变量，表示裁剪空间位置（四维齐次坐标）
- */
-const char* vertexShaderSource = R"glsl(
-#version 330 core
-layout (location = 0) in vec3 aPos;
-void main()
-{
-    gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
-}
-)glsl";
-
-/**
- * @brief 片段着色器 GLSL 源代码
- * 
- * 功能：为每个片段（像素）输出固定的橙色
- * - out vec4 FragColor：输出的片段颜色 (RGBA)
- * - 颜色值：(1.0, 0.5, 0.2, 1.0) 表示橙色，完全不透明
- */
-const char* fragmentShaderSource = R"glsl(
-#version 330 core
-out vec4 FragColor;
-void main()
-{
-    FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
-}
-)glsl";
-
 } // namespace
 
 // ==================== 构造函数和析构函数 ====================
@@ -116,10 +103,16 @@ bool MyWindow::initialize()
     // 确保当前线程的 OpenGL 上下文是此窗口的上下文
     SDL_GL_MakeCurrent(m_window, m_glContext);
 
-    // 第一步：编译着色器程序
+    // 第一步：从文件加载并编译着色器程序
     // 着色器程序是运行在 GPU 上的小程序，用于处理顶点和片段
-    if (!m_shader.compile(vertexShaderSource, fragmentShaderSource)) {
-        NEAPU_LOGE("Failed to compile shader");
+    std::string vertexPath = getShaderPath("vertex.glsl");
+    std::string fragmentPath = getShaderPath("fragment.glsl");
+    
+    NEAPU_LOGI("Loading vertex shader from: {}", vertexPath);
+    NEAPU_LOGI("Loading fragment shader from: {}", fragmentPath);
+    
+    if (!m_shader.loadFromFile(vertexPath, fragmentPath)) {
+        NEAPU_LOGE("Failed to load shader from files");
         return false;
     }
 
@@ -151,18 +144,30 @@ bool MyWindow::initialize()
                  GL_STATIC_DRAW);            // 使用模式
 
     // 第六步：配置顶点属性
-    // 告诉 OpenGL 如何解释 VBO 中的顶点数据
+    // 顶点数据布局：| 位置 (3 floats) | 颜色 (3 floats) |
+    // 步长 = 6 * sizeof(float) = 24 字节
+    
+    // 位置属性 (location = 0)
     glVertexAttribPointer(
         0,                   // 属性索引（对应着色器中的 location = 0）
-        3,                   // 每个顶点属性的分量数量（vec3 = 3 个分量）
+        3,                   // 每个属性的分量数量（vec3 = 3 个分量）
         GL_FLOAT,            // 数据类型
-        GL_FALSE,            // 是否标准化（映射到 [0,1] 或 [-1,1]）
-        3 * sizeof(float),   // 步长（相邻顶点属性之间的字节偏移）
-        (void*)0             // 属性在缓冲区中的起始偏移
+        GL_FALSE,            // 是否标准化
+        6 * sizeof(float),   // 步长（相邻顶点之间的字节偏移）
+        (void*)0             // 属性在顶点数据中的起始偏移
     );
-    
-    // 启用顶点属性（索引 0）
     glEnableVertexAttribArray(0);
+    
+    // 颜色属性 (location = 1)
+    glVertexAttribPointer(
+        1,                   // 属性索引（对应着色器中的 location = 1）
+        3,                   // 每个属性的分量数量（vec3 = 3 个分量）
+        GL_FLOAT,            // 数据类型
+        GL_FALSE,            // 是否标准化
+        6 * sizeof(float),   // 步长
+        (void*)(3 * sizeof(float))  // 偏移：跳过前面 3 个 float（位置数据）
+    );
+    glEnableVertexAttribArray(1);
 
     // 解绑 VAO（可选，防止意外修改）
     // 注意：不要在 VAO 活动时解绑 EBO，因为 EBO 是 VAO 状态的一部分
