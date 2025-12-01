@@ -1,9 +1,0 @@
-/home/neapu/code/LearnOpenGL/build/Linux-Debug/CMakeFiles/glad.dir
-/home/neapu/code/LearnOpenGL/build/Linux-Debug/CMakeFiles/edit_cache.dir
-/home/neapu/code/LearnOpenGL/build/Linux-Debug/CMakeFiles/rebuild_cache.dir
-/home/neapu/code/LearnOpenGL/build/Linux-Debug/first_party/logger/CMakeFiles/logger.dir
-/home/neapu/code/LearnOpenGL/build/Linux-Debug/first_party/logger/CMakeFiles/edit_cache.dir
-/home/neapu/code/LearnOpenGL/build/Linux-Debug/first_party/logger/CMakeFiles/rebuild_cache.dir
-/home/neapu/code/LearnOpenGL/build/Linux-Debug/src/CMakeFiles/LearnOpenGL.dir
-/home/neapu/code/LearnOpenGL/build/Linux-Debug/src/CMakeFiles/edit_cache.dir
-/home/neapu/code/LearnOpenGL/build/Linux-Debug/src/CMakeFiles/rebuild_cache.dir

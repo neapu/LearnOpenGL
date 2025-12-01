@@ -1,9 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/neapu/code/LearnOpenGL/build/Linux-Debug/cmake_install.cmake",
-		"/home/neapu/code/LearnOpenGL/build/Linux-Debug/first_party/logger/cmake_install.cmake",
-		"/home/neapu/code/LearnOpenGL/build/Linux-Debug/src/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
